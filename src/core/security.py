@@ -6,7 +6,8 @@ from cryptography.fernet import Fernet
 from src.core.config import settings
 import uuid
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use sha256_crypt instead of bcrypt for better compatibility
+pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 
 class Security:
     @staticmethod
@@ -43,5 +44,3 @@ class Security:
     def decrypt_data(encrypted_data: str) -> str:
         cipher = Fernet(settings.ENCRYPTION_KEY.encode())
         return cipher.decrypt(encrypted_data.encode()).decode()
-    
-    
