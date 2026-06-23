@@ -1,22 +1,32 @@
+import hashlib
+import secrets
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from typing import Dict, Any
+from jose import jwt
 from cryptography.fernet import Fernet
 from src.core.config import settings
 import uuid
 
-# Use sha256_crypt instead of bcrypt for better compatibility
-pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
+# Simple hash functions using hashlib (no external dependencies)
+def get_password_hash(password: str) -> str:
+    salt = secrets.token_hex(16)
+    return salt + ":" + hashlib.sha256((salt + password).encode()).hexdigest()
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        salt, hash_value = hashed_password.split(":")
+        return hash_value == hashlib.sha256((salt + plain_password).encode()).hexdigest()
+    except:
+        return False
 
 class Security:
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(plain_password, hashed_password)
+        return verify_password(plain_password, hashed_password)
     
     @staticmethod
     def get_password_hash(password: str) -> str:
-        return pwd_context.hash(password)
+        return get_password_hash(password)
     
     @staticmethod
     def create_access_token(data: Dict[str, Any]) -> str:
