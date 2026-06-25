@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import uuid
@@ -6,11 +6,58 @@ import uuid
 from src.core.database import get_db
 from src.models.user import User
 from src.models.message import Message
-from src.schemas.message import MessageResponse, MessageListResponse, MessageReplyRequest
+from src.models.channel import Channel
+from src.schemas.message import (
+    MessageResponse, 
+    MessageListResponse, 
+    MessageReplyRequest,
+    MessageCreate
+)
 from src.api.deps import get_current_user
 from src.services.message_service import MessageService
 
 router = APIRouter(prefix="/messages", tags=["messages"])
+
+@router.post("/", response_model=MessageResponse)
+async def create_message(
+    message_data: MessageCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new message (send a message)
+    """
+    # Verify channel belongs to user
+    channel = db.query(Channel).filter(
+        Channel.id == message_data.channel_id,
+        Channel.user_id == current_user.id
+    ).first()
+    
+    if not channel:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Channel not found or does not belong to you"
+        )
+    
+    # Create the message
+    new_message = Message(
+        user_id=current_user.id,
+        channel_id=message_data.channel_id,
+        persona_id=message_data.persona_id,
+        subject=message_data.subject,
+        body=message_data.body,
+        sender=message_data.sender,
+        recipients=message_data.recipients,
+        sent_at=message_data.sent_at,
+        external_id=message_data.external_id,
+        thread_external_id=message_data.thread_external_id
+    )
+    
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+    
+    return new_message
 
 @router.get("/", response_model=MessageListResponse)
 async def get_messages(
@@ -165,4 +212,3 @@ async def get_thread(
         raise HTTPException(status_code=404, detail="Thread not found")
     
     return {"thread": messages, "count": len(messages)}
-

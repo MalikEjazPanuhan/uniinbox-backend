@@ -54,4 +54,3 @@ class MessageListResponse(BaseModel):
 class MessageReplyRequest(BaseModel):
     content: str
     persona_id: Optional[UUID] = None
-
