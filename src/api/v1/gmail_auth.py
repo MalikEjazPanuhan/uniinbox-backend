@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from google_auth_oauthlib.flow import Flow
-from google.oauth2.credentials import Credentials
-import json
 import logging
 
 from src.core.database import get_db
@@ -50,8 +48,6 @@ async def get_gmail_auth_url(
             prompt='consent'
         )
 
-        # In a production app, you should store the 'state' in the user's session
-        # to prevent CSRF attacks. For simplicity in this guide, we are not implementing that.
         return {"auth_url": auth_url, "state": state}
     except Exception as e:
         logger.error(f"Error generating Gmail auth URL: {e}")
@@ -71,11 +67,10 @@ async def gmail_callback(
     if not settings.GMAIL_CLIENT_ID or not settings.GMAIL_CLIENT_SECRET:
         raise HTTPException(
             status_code=500,
-            detail="Gmail client ID or secret not configured on the server."
+            detail="Gmail client ID or secret not configured."
         )
 
     try:
-        # Recreate the flow with the same configuration
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -94,47 +89,39 @@ async def gmail_callback(
             redirect_uri=settings.GMAIL_REDIRECT_URI
         )
 
-        # Fetch the access token using the authorization code
         flow.fetch_token(code=code)
         credentials = flow.credentials
+
+        logger.info(f"Token received: {bool(credentials.token)}")
+        logger.info(f"Refresh token received: {bool(credentials.refresh_token)}")
 
         if not credentials or not credentials.token:
             raise HTTPException(status_code=400, detail="Failed to obtain access token from Google.")
 
-        # Save or update the Gmail channel for this user
-        existing_channel = db.query(Channel).filter(
+        # Delete any existing Gmail channel for this user
+        db.query(Channel).filter(
             Channel.user_id == current_user.id,
             Channel.channel_type == "gmail"
-        ).first()
+        ).delete()
 
-        if existing_channel:
-            # Update existing channel with new tokens
-            existing_channel.access_token = credentials.token
-            existing_channel.refresh_token = credentials.refresh_token
-            existing_channel.token_expiry = credentials.expiry
-            existing_channel.is_active = True
-            logger.info(f"Updated existing Gmail channel for user: {current_user.email}")
-        else:
-            # Create a new channel
-            new_channel = Channel(
-                user_id=current_user.id,
-                channel_type="gmail",
-                channel_name="Gmail",
-                access_token=credentials.token,
-                refresh_token=credentials.refresh_token,
-                token_expiry=credentials.expiry,
-                is_active=True,
-                config={}
-            )
-            db.add(new_channel)
-            logger.info(f"Created new Gmail channel for user: {current_user.email}")
-
+        # Create new channel with tokens
+        new_channel = Channel(
+            user_id=current_user.id,
+            channel_type="gmail",
+            channel_name="Gmail",
+            access_token=credentials.token,
+            refresh_token=credentials.refresh_token,
+            token_expiry=credentials.expiry,
+            is_active=True,
+            config={}
+        )
+        db.add(new_channel)
         db.commit()
-        logger.info(f"Gmail OAuth flow successful for user: {current_user.email}")
 
-        # You can redirect to a success page or return a JSON response
-        # For a frontend application, a redirect is often best.
-        return {"message": "Gmail connected successfully!"}
+        logger.info(f"Gmail OAuth successful! Token saved for user: {current_user.email}")
+        logger.info(f"Channel ID: {new_channel.id}")
+
+        return {"message": "Gmail connected successfully!", "success": True}
 
     except Exception as e:
         logger.error(f"Error in Gmail OAuth callback: {e}")
