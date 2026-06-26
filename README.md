@@ -426,15 +426,3 @@ Mobile App
 Analytics Dashboard
 
 Built with ❤️ by Malik Ejaz
-
-text
-
----
-
-## ✅ **Save and Commit**
-
-```powershell
-cd F:\uniinbox\backend
-git add README.md
-git commit -m "Add comprehensive README.md for backend"
-git push origin main
