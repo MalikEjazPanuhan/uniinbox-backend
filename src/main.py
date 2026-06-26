@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from src.core.config import settings
 from src.core.database import engine, Base
-from src.api.v1 import auth, users, personas, channels, messages, ai, onboarding
+from src.api.v1 import auth, users, personas, channels, messages, ai, onboarding, gmail_auth
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,6 +37,7 @@ app.include_router(channels.router, prefix="/api/v1")
 app.include_router(messages.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 app.include_router(onboarding.router, prefix="/api/v1")
+app.include_router(gmail_auth.router, prefix="/api/v1")  # ← ADD THIS LINE
 
 @app.get("/")
 async def root():
@@ -50,4 +51,3 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "UniInbox AI"}
-
